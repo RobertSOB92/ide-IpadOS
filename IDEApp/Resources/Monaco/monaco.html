@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Monaco Editor</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading editor...</div>
+    <div id="container"></div>
+
+    <!-- Monaco Editor from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.min.js"></script>
+    
+    <script>
+        // Configure Monaco loader
+        require.config({ 
+            paths: { 
+                'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' 
+            } 
+        });
+        
+        let editor = null;
+        let currentValue = '';
+        
+        // Load Monaco
+        require(['vs/editor/editor.main'], function() {
+            document.getElementById('loading').style.display = 'none';
+            
+            // Create editor
+            editor = monaco.editor.create(document.getElementById('container'), {
+                value: '',
+                language: 'javascript',
+                theme: 'vs-dark',
+                fontSize: 14,
+                tabSize: 4,
+                automaticLayout: true,
+                minimap: {
+                    enabled: true
+                },
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                lineNumbers: 'on',
+                renderWhitespace: 'selection',
+                folding: true,
+                glyphMargin: true,
+                // iPad optimizations
+                quickSuggestions: true,
+                suggestOnTriggerCharacters: true,
+                acceptSuggestionOnCommitCharacter: true,
+                tabCompletion: 'on',
+                wordBasedSuggestions: true
+            });
+            
+            // Listen for content changes
+            editor.onDidChangeModelContent(function(e) {
+                currentValue = editor.getValue();
+                sendToIOS({
+                    event: 'contentChanged',
+                    content: currentValue
+                });
+            });
+            
+            // Notify iOS that editor is ready
+            sendToIOS({
+                event: 'ready'
+            });
+            
+            // Make editor globally accessible
+            window.editor = editor;
+        });
+        
+        // Send messages to iOS
+        function sendToIOS(message) {
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iosListener) {
+                window.webkit.messageHandlers.iosListener.postMessage(message);
+            }
+        }
+        
+        // Functions callable from Swift
+        window.setContent = function(content) {
+            if (editor) {
+                editor.setValue(content || '');
+            }
+        };
+        
+        window.getContent = function() {
+            return editor ? editor.getValue() : '';
+        };
+        
+        window.setLanguage = function(language) {
+            if (editor) {
+                const model = editor.getModel();
+                monaco.editor.setModelLanguage(model, language);
+            }
+        };
+        
+        window.setTheme = function(theme) {
+            if (editor) {
+                monaco.editor.setTheme(theme);
+            }
+        };
+        
+        window.setFontSize = function(size) {
+            if (editor) {
+                editor.updateOptions({ fontSize: size });
+            }
+        };
+        
+        window.setTabSize = function(size) {
+            if (editor) {
+                editor.updateOptions({ tabSize: size });
+            }
+        };
+        
+        window.format = function() {
+            if (editor) {
+                editor.getAction('editor.action.formatDocument').run();
+            }
+        };
+        
+        window.undo = function() {
+            if (editor) {
+                editor.trigger('keyboard', 'undo');
+            }
+        };
+        
+        window.redo = function() {
+            if (editor) {
+                editor.trigger('keyboard', 'redo');
+            }
+        };
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (editor) {
+                editor.layout();
+            }
+        });
+        
+        // Detect language from filename
+        function detectLanguage(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const languageMap = {
+                'js': 'javascript',
+                'jsx': 'javascript',
+                'ts': 'typescript',
+                'tsx': 'typescript',
+                'py': 'python',
+                'swift': 'swift',
+                'java': 'java',
+                'cpp': 'cpp',
+                'c': 'c',
+                'h': 'cpp',
+                'hpp': 'cpp',
+                'cs': 'csharp',
+                'php': 'php',
+                'rb': 'ruby',
+                'go': 'go',
+                'rs': 'rust',
+                'sql': 'sql',
+                'sh': 'shell',
+                'bash': 'shell',
+                'json': 'json',
+                'xml': 'xml',
+                'html': 'html',
+                'htm': 'html',
+                'css': 'css',
+                'scss': 'scss',
+                'sass': 'scss',
+                'less': 'less',
+                'md': 'markdown',
+                'yaml': 'yaml',
+                'yml': 'yaml',
+                'toml': 'toml',
+                'dockerfile': 'dockerfile',
+                'gitignore': 'plaintext',
+                'txt': 'plaintext'
+            };
+            return languageMap[ext] || 'plaintext';
+        }
+        
+        window.setFilename = function(filename) {
+            const language = detectLanguage(filename);
+            window.setLanguage(language);
+        };
+    </script>
+</body>
+</html>
